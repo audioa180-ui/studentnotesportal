@@ -153,204 +153,324 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // --- small helper: read token ---
     function getToken(){ return localStorage.getItem('token'); }
 
-    async function api(path, opts={}, requireAuth=true){
+    // --- normalize incoming docs to support snake_case or camelCase payloads ---
+    function normalizeDoc(doc){
+      if(!doc || typeof doc !== 'object') return doc;
+      if(doc.class_id && !doc.classId) doc.classId = doc.class_id;
+      if(doc.semester_id && !doc.semesterId) doc.semesterId = doc.semester_id;
+      if(doc.subject_id && !doc.subjectId) doc.subjectId = doc.subject_id;
+      // also normalize nested objects if present
+      if(doc.semester_id && doc.semester_id.class_id && !doc.semesterId?.classId){
+        if(!doc.semesterId) doc.semesterId = doc.semester_id;
+        if(doc.semesterId.class_id && !doc.semesterId.classId) doc.semesterId.classId = doc.semesterId.class_id;
+      }
+      return doc;
+    }
+
+    // --- simple API helper (adds Authorization header when required) ---
+    async function api(path, opts = {}, requireAuth = true){
       opts.headers = opts.headers || {};
       if(requireAuth){
         const token = getToken();
         if(token) opts.headers['Authorization'] = 'Bearer ' + token;
       }
-      const res = await fetch(path, opts);
-      if (!res.ok) throw new Error(await res.text());
-      return res.json().catch(()=>null);
+      try{
+        const res = await fetch(path, opts);
+        if(!res.ok){
+          const text = await res.text();
+          throw new Error(text || res.statusText);
+        }
+        // try parse JSON, otherwise return null
+        const contentType = res.headers.get('content-type') || '';
+        if(contentType.includes('application/json')){
+          return await res.json();
+        }
+        return null;
+      }catch(err){
+        console.error('API error', path, err);
+        throw err;
+      }
     }
 
     // ===== Login =====
     document.getElementById("loginBtn").addEventListener("click", async ()=>{
-      let u=document.getElementById("username").value.trim();
-      let p=document.getElementById("password").value.trim();
+      let u = document.getElementById("username").value.trim();
+      let p = document.getElementById("password").value.trim();
       try{
         const data = await api('/api/login', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ username: u, password: p })
         }, false);
-        if (!data || !data.token) throw new Error("Invalid");
+        if(!data || !data.token) throw new Error('Invalid');
         localStorage.setItem('token', data.token);
         document.getElementById("loginScreen").style.display="none";
         document.getElementById("dashboard").style.display="block";
         document.getElementById("errorMsg").style.display="none";
-        loadAllTables();
+        await loadAllTables();
       }catch(err){
         document.getElementById("errorMsg").style.display="block";
+        console.error('login error', err);
       }
     });
 
-    document.getElementById("logoutBtn").addEventListener("click",()=>{
+    document.getElementById("logoutBtn").addEventListener("click", ()=>{
       localStorage.removeItem('token');
       document.getElementById("dashboard").style.display="none";
       document.getElementById("loginScreen").style.display="flex";
     });
 
     document.querySelectorAll(".sidebar a[data-section]").forEach(link=>{
-      link.addEventListener("click",()=>{
+      link.addEventListener("click", ()=>{
         document.querySelectorAll('.section').forEach(sec=>sec.style.display="none");
-        let id=link.getAttribute("data-section");
+        let id = link.getAttribute("data-section");
         document.getElementById(id).style.display="block";
-        document.getElementById("sectionTitle").innerText=id.charAt(0).toUpperCase()+id.slice(1);
+        document.getElementById("sectionTitle").innerText = id.charAt(0).toUpperCase() + id.slice(1);
       });
     });
 
-    // ===== Load Data =====
+    // ===== Loaders =====
     async function loadAllTables(){
-      await loadClasses();
-      await loadSemesters();
-      await loadSubjects();
-      await loadNotes();
-      await loadUsers();
+      try{
+        await loadClasses();
+        await loadSemesters();
+        await loadSubjects();
+        await loadNotes();
+        await loadUsers();
+      }catch(err){
+        console.error('loadAllTables error', err);
+      }
     }
 
     async function loadClasses(){
-      const classes = await api('/api/classes');
-      const tbody = document.getElementById('classesTable');
-      tbody.innerHTML = '';
-      classes.forEach(c=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${c.name}</td>
-                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${c._id}','class')">Delete</button></td>`;
-        tbody.appendChild(tr);
-      });
-      // fill semester class select
-      const semSel = document.getElementById('semesterClass');
-      semSel.innerHTML = '';
-      classes.forEach(c=> semSel.innerHTML += `<option value="${c._id}">${c.name}</option>`);
-      // fill note class select
-      const noteSel = document.getElementById('noteClass');
-      noteSel.innerHTML = '';
-      classes.forEach(c=> noteSel.innerHTML += `<option value="${c._id}">${c.name}</option>`);
-      // fill subject class select
-      const subjSel = document.getElementById('subjectClass');
-      subjSel.innerHTML = '';
-      classes.forEach(c=> subjSel.innerHTML += `<option value="${c._id}">${c.name}</option>`);
+      try{
+        const classes = (await api('/api/classes')) || [];
+        const tbody = document.getElementById('classesTable');
+        tbody.innerHTML = '';
+        classes.forEach(c=>{
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${c.name}</td>
+                          <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${c._id}','class')">Delete</button></td>`;
+          tbody.appendChild(tr);
+        });
+        // populate selects that choose classes
+        const semSel = document.getElementById('semesterClass');
+        const noteSel = document.getElementById('noteClass');
+        const subjSel = document.getElementById('subjectClass');
+        [semSel, noteSel, subjSel].forEach(sel=>{
+          if(!sel) return;
+          sel.innerHTML = classes.map(c=>`<option value="${c._id}">${c.name}</option>`).join('');
+        });
+      }catch(err){
+        console.error('loadClasses', err);
+      }
     }
 
     async function loadSemesters(){
-      const semesters = await api('/api/semesters');
-      const tbody = document.getElementById('semestersTable');
-      tbody.innerHTML = '';
-      semesters.forEach(s=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${s.name}</td>
-                        <td>${s.class_id?.name||''}</td>
-                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${s._id}','semester')">Delete</button></td>`;
-        tbody.appendChild(tr);
-      });
+      try{
+        let semesters = (await api('/api/semesters')) || [];
+        const tbody = document.getElementById('semestersTable');
+        tbody.innerHTML = '';
+        semesters.forEach(s=>{
+          const sd = normalizeDoc(s);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${sd.name}</td>
+                          <td>${sd.classId?.name || ''}</td>
+                          <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${sd._id}','semester')">Delete</button></td>`;
+          tbody.appendChild(tr);
+        });
+        // populate semester selects used for subjects/notes
+        const subjSemester = document.getElementById('subjectSemester');
+        const noteSemester = document.getElementById('noteSemester');
+        [subjSemester, noteSemester].forEach(sel=>{
+          if(!sel) return;
+          sel.innerHTML = semesters.map(s=>`<option value="${s._id}">${normalizeDoc(s).name}</option>`).join('');
+        });
+      }catch(err){
+        console.error('loadSemesters', err);
+      }
     }
 
     async function loadSubjects(){
-      const subjects = await api('/api/subjects');
-      const tbody = document.getElementById('subjectsTable');
-      tbody.innerHTML = '';
-      subjects.forEach(s=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${s.name}</td>
-                        <td>${s.semester_id?.name||''} (${s.semester_id?.class_id?.name||''})</td>
-                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${s._id}','subject')">Delete</button></td>`;
-        tbody.appendChild(tr);
-      });
+      try{
+        const subjects = (await api('/api/subjects')) || [];
+        const tbody = document.getElementById('subjectsTable');
+        tbody.innerHTML = '';
+        subjects.forEach(s=>{
+          const sd = normalizeDoc(s);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${sd.name}</td>
+                          <td>${sd.semesterId?.name || ''} (${sd.classId?.name || ''})</td>
+                          <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${sd._id}','subject')">Delete</button></td>`;
+          tbody.appendChild(tr);
+        });
+        const noteSubSel = document.getElementById('noteSubject');
+        if(noteSubSel) noteSubSel.innerHTML = subjects.map(s=>`<option value="${s._id}">${normalizeDoc(s).name}</option>`).join('');
+      }catch(err){
+        console.error('loadSubjects', err);
+      }
     }
 
     async function loadNotes(){
-      const notes = await api('/api/notes');
-      const tbody = document.getElementById('notesTable');
-      tbody.innerHTML = '';
-      notes.forEach(n=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${n.title}</td>
-                        <td>${n.subject_id?.name||''}</td>
-                        <td>${n.subject_id?.semester_id?.name||''}</td>
-                        <td>${n.subject_id?.semester_id?.class_id?.name||''}</td>
-                        <td><a href="${n.file}" target="_blank">Download</a></td>
-                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${n._id}','note')">Delete</button></td>`;
-        tbody.appendChild(tr);
-      });
+      try{
+        const notes = (await api('/api/notes')) || [];
+        const tbody = document.getElementById('notesTable');
+        tbody.innerHTML = '';
+        notes.forEach(n=>{
+          const nd = normalizeDoc(n);
+          // try to support either file url field name or original file link
+          const fileLink = nd.file || (/uploads\/.+/.test(nd.filename || '') ? `/uploads/${nd.filename}` : (nd.fileUrl || nd.fileUrl || '#'));
+          const fileText = (nd.originalName || nd.filename || 'file');
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${nd.title}</td>
+                          <td>${nd.subjectId?.name || ''}</td>
+                          <td>${nd.semesterId?.name || ''}</td>
+                          <td>${nd.classId?.name || ''}</td>
+                          <td><a href="${fileLink}" target="_blank">${fileText}</a></td>
+                          <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${nd._id}','note')">Delete</button></td>`;
+          tbody.appendChild(tr);
+        });
+      }catch(err){
+        console.error('loadNotes', err);
+      }
     }
 
     async function loadUsers(){
-      const users = await api('/api/users');
-      const tbody = document.getElementById('usersTable');
-      tbody.innerHTML = '';
-      users.forEach(u=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${u.username}</td>
-                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${u._id}','user')">Delete</button></td>`;
-        tbody.appendChild(tr);
-      });
+      try{
+        const users = (await api('/api/users')) || [];
+        const tbody = document.getElementById('usersTable');
+        tbody.innerHTML = '';
+        users.forEach(u=>{
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${u.username}</td>
+                          <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${u._id}','user')">Delete</button></td>`;
+          tbody.appendChild(tr);
+        });
+      }catch(err){
+        console.error('loadUsers', err);
+      }
     }
 
-    // ===== Delete Item =====
+    // ===== delete helper =========
     async function deleteItem(id, type){
-      if (!confirm('Delete?')) return;
+      if(!confirm('Delete?')) return;
       let path = '/api/';
-      if (type === 'class') path += 'classes/';
-      else if (type === 'semester') path += 'semesters/';
-      else if (type === 'subject') path += 'subjects/';
-      else if (type === 'note') path += 'notes/';
-      else if (type === 'user') path += 'users/';
-      await api(path + id, { method: 'DELETE' });
-      loadAllTables();
+      if(type==='class') path += 'classes/';
+      else if(type==='semester') path += 'semesters/';
+      else if(type==='subject') path += 'subjects/';
+      else if(type==='note') path += 'notes/';
+      else if(type==='user') path += 'users/';
+      try{
+        await api(path + id, { method: 'DELETE' });
+        await loadAllTables();
+      }catch(err){
+        console.error('deleteItem', err);
+        alert('Delete failed: ' + (err.message || err));
+      }
     }
 
-    // ===== Form Submissions =====
+    // ===== Form Submissions (fixed to use camelCase keys) =====
     document.getElementById('classForm').addEventListener('submit', async function(e){
       e.preventDefault();
-      const name = document.getElementById('className').value.trim();
-      await api('/api/classes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
-      this.reset(); loadClasses();
-      bootstrap.Modal.getInstance(document.getElementById('addClassModal')).hide();
+      try{
+        const name = document.getElementById('className').value.trim();
+        await api('/api/classes', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ name }) });
+        this.reset();
+        bootstrap.Modal.getInstance(document.getElementById('addClassModal'))?.hide();
+        await loadClasses();
+      }catch(err){
+        console.error('classForm submit', err);
+        alert('Add class failed');
+      }
     });
 
     document.getElementById('semesterForm').addEventListener('submit', async function(e){
       e.preventDefault();
-      const name = document.getElementById('semesterName').value.trim();
-      const class_id = document.getElementById('semesterClass').value;
-      await api('/api/semesters', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, class_id }) });
-      this.reset(); loadSemesters();
-      bootstrap.Modal.getInstance(document.getElementById('addSemesterModal')).hide();
+      try{
+        const name = document.getElementById('semesterName').value.trim();
+        const classId = document.getElementById('semesterClass').value;
+        await api('/api/semesters', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ name, classId }) });
+        this.reset();
+        bootstrap.Modal.getInstance(document.getElementById('addSemesterModal'))?.hide();
+        await loadSemesters();
+        await loadSubjects(); // refresh dependent lists
+        await loadNotes();
+      }catch(err){
+        console.error('semesterForm submit', err);
+        alert('Add semester failed');
+      }
     });
 
     document.getElementById('subjectForm').addEventListener('submit', async function(e){
       e.preventDefault();
-      const name = document.getElementById('subjectName').value.trim();
-      const semester_id = document.getElementById('subjectSemester').value;
-      await api('/api/subjects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, semester_id }) });
-      this.reset(); loadSubjects();
-      bootstrap.Modal.getInstance(document.getElementById('addSubjectModal')).hide();
+      try{
+        const name = document.getElementById('subjectName').value.trim();
+        const classId = document.getElementById('subjectClass').value;
+        const semesterId = document.getElementById('subjectSemester').value;
+        await api('/api/subjects', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ name, classId, semesterId }) });
+        this.reset();
+        bootstrap.Modal.getInstance(document.getElementById('addSubjectModal'))?.hide();
+        await loadSubjects();
+        await loadNotes();
+      }catch(err){
+        console.error('subjectForm submit', err);
+        alert('Add subject failed');
+      }
     });
 
     document.getElementById('noteForm').addEventListener('submit', async function(e){
       e.preventDefault();
-      const title = document.getElementById('noteTitle').value.trim();
-      const subject_id = document.getElementById('noteSubject').value;
-      const file = document.getElementById('noteFile').files[0];
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('subject_id', subject_id);
-      formData.append('file', file);
-      await api('/api/notes', { method:'POST', body: formData });
-      this.reset(); loadNotes();
-      bootstrap.Modal.getInstance(document.getElementById('addNoteModal')).hide();
+      try{
+        const title = document.getElementById('noteTitle').value.trim();
+        const classId = document.getElementById('noteClass').value;
+        const semesterId = document.getElementById('noteSemester').value;
+        const subjectId = document.getElementById('noteSubject').value;
+        const file = document.getElementById('noteFile').files[0];
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('classId', classId);
+        formData.append('semesterId', semesterId);
+        formData.append('subjectId', subjectId);
+        if(file) formData.append('file', file);
+        // use fetch directly to allow multipart form data, include auth header
+        await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + getToken() },
+          body: formData
+        }).then(async res => {
+          if(!res.ok) throw new Error(await res.text());
+          return res.json();
+        });
+        this.reset();
+        bootstrap.Modal.getInstance(document.getElementById('addNoteModal'))?.hide();
+        await loadNotes();
+      }catch(err){
+        console.error('noteForm submit', err);
+        alert('Add note failed');
+      }
     });
 
     document.getElementById('userForm').addEventListener('submit', async function(e){
       e.preventDefault();
-      const username = document.getElementById('newUsername').value.trim();
-      const password = document.getElementById('newPassword').value.trim();
-      await api('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password }) });
-      this.reset(); loadUsers();
-      bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+      try{
+        const username = document.getElementById('newUsername').value.trim();
+        const password = document.getElementById('newPassword').value.trim();
+        await api('/api/users', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ username, password }) });
+        this.reset();
+        bootstrap.Modal.getInstance(document.getElementById('addUserModal'))?.hide();
+        await loadUsers();
+      }catch(err){
+        console.error('userForm submit', err);
+        alert('Add user failed');
+      }
     });
+
+    // ===== Init =====
+    // Keep dashboard hidden until logged in
+    // When logged in, loadAllTables() is called by login handler
   </script>
 </body>
 </html>
