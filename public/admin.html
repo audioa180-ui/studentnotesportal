@@ -334,6 +334,24 @@
       selectEl.innerHTML = opts.join('');
     }
 
+    // Populate the Add Note subject select based on current class and semester selections
+    function setNoteSubjectOptions(){
+      const subjectSel = document.getElementById('noteSubject');
+      if(!subjectSel) return;
+      const classId = document.getElementById('noteClass')?.value || '';
+      const semesterId = document.getElementById('noteSemester')?.value || '';
+      const filtered = (__subjects || []).map(normalizeDoc).filter(s => {
+        const cOk = !classId || s.classId?._id === classId || s.classId === classId;
+        const semOk = !semesterId || s.semesterId?._id === semesterId || s.semesterId === semesterId;
+        return cOk && semOk;
+      });
+      if(filtered.length === 0){
+        subjectSel.innerHTML = '<option value="" disabled selected>None available</option>';
+        return;
+      }
+      subjectSel.innerHTML = filtered.map(s => `<option value="${s._id}">${s.name}</option>`).join('');
+    }
+
     // Update the Note Subject filter based on current Class/Semester filters
     function updateNoteSubjectFilter(){
       const subjSel = document.getElementById('noteFilterSubject');
@@ -636,8 +654,8 @@
         tbody.innerHTML = '';
         // render via renderer
         renderSubjectsTable();
-        const noteSubSel = document.getElementById('noteSubject');
-        if(noteSubSel) noteSubSel.innerHTML = subjects.map(s=>`<option value="${s._id}">${normalizeDoc(s).name}</option>`).join('');
+        // Populate Add Note subject select based on current class+semester selections
+        setNoteSubjectOptions();
         // update subject filter for notes
         updateNoteSubjectFilter();
       }catch(err){
@@ -851,9 +869,15 @@
     // Update semester selects in Add forms when class changes
     document.getElementById('noteClass')?.addEventListener('change', ()=>{
       setSemesterOptionsFor(document.getElementById('noteSemester'), document.getElementById('noteClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
+      // refresh subject options for the Add Note form when class changes
+      setNoteSubjectOptions();
     });
     document.getElementById('subjectClass')?.addEventListener('change', ()=>{
       setSemesterOptionsFor(document.getElementById('subjectSemester'), document.getElementById('subjectClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
+    });
+    // Also update Add Note subject options when semester changes
+    document.getElementById('noteSemester')?.addEventListener('change', ()=>{
+      setNoteSubjectOptions();
     });
 
     // ===== Init =====
