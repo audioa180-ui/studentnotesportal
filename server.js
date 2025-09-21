@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');   // ✅ switched from bcrypt → bcryptjs
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const cors = require('cors');
