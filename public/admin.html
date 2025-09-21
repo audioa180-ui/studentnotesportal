@@ -14,12 +14,43 @@
     .sidebar a { display: block; padding: 10px; color: white; text-decoration: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; }
     .sidebar a:hover { background: rgba(255,255,255,0.2); }
     .content { padding: 20px; }
+    /* Mobile tweaks */
+    @media (max-width: 767.98px){
+      .content { padding: 12px; }
+    }
   </style>
 </head>
 <body>
+  <!-- Mobile top bar (hidden on md and up) -->
+  <nav class="navbar navbar-dark bg-dark d-md-none">
+    <div class="container-fluid">
+      <span class="navbar-brand mb-0 h1">Admin Panel</span>
+      <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileMenu" aria-controls="mobileMenu" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Offcanvas menu for mobile -->
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileMenu" aria-labelledby="mobileMenuLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="mobileMenuLabel">Admin Panel</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <div class="nav flex-column" id="mobileNavLinks">
+        <a class="nav-link" data-section="notes">📚 Manage Notes</a>
+        <a class="nav-link" data-section="subjects">📖 Manage Subjects</a>
+        <a class="nav-link" data-section="classes">🏫 Manage Classes</a>
+        <a class="nav-link" data-section="semesters">📅 Manage Semesters</a>
+        <a class="nav-link" data-section="users">👤 Manage Users</a>
+        <a class="nav-link" id="logoutBtnMobile">🚪 Logout</a>
+      </div>
+    </div>
+  </div>
   <!-- Login Screen -->
   <div class="login-container" id="loginScreen">
-    <div class="card shadow p-4" style="width: 350px;">
+    <div class="card shadow p-4" style="width: 350px; max-width: 90vw;">
       <h3 class="text-center mb-3">Admin Login</h3>
       <div class="mb-3"><input type="text" id="username" class="form-control" placeholder="Username"></div>
       <div class="mb-3"><input type="password" id="password" class="form-control" placeholder="Password"></div>
@@ -31,7 +62,7 @@
   <!-- Dashboard -->
   <div class="dashboard" id="dashboard">
     <div class="d-flex">
-      <div class="sidebar">
+      <div class="sidebar d-none d-md-block">
         <h2>Admin Panel</h2>
         <a data-section="notes">📚 Manage Notes</a>
         <a data-section="subjects">📖 Manage Subjects</a>
@@ -76,10 +107,12 @@
           <div class="d-flex justify-content-end mb-2">
             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">+ Add Note</button>
           </div>
+          <div class="table-responsive">
           <table class="table table-striped">
             <thead><tr><th>Note Title</th><th>Subject</th><th>Semester</th><th>Class</th><th>File</th><th>Actions</th></tr></thead>
             <tbody id="notesTable"></tbody>
           </table>
+          </div>
         </div>
 
         <!-- Subjects Section -->
@@ -109,10 +142,12 @@
           <div class="d-flex justify-content-end mb-2">
             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addSubjectModal">+ Add Subject</button>
           </div>
+          <div class="table-responsive">
           <table class="table table-bordered">
             <thead><tr><th>Subject Name</th><th>Semester</th><th>Actions</th></tr></thead>
             <tbody id="subjectsTable"></tbody>
           </table>
+          </div>
         </div>
 
         <!-- Classes Section -->
@@ -128,10 +163,12 @@
               <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addClassModal">+ Add Class</button>
             </div>
           </div>
+          <div class="table-responsive">
           <table class="table table-hover">
             <thead><tr><th>Class Name</th><th>Actions</th></tr></thead>
             <tbody id="classesTable"></tbody>
           </table>
+          </div>
         </div>
 
         <!-- Semesters Section -->
@@ -148,19 +185,23 @@
               <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addSemesterModal">+ Add Semester</button>
             </div>
           </div>
+          <div class="table-responsive">
           <table class="table table-hover">
             <thead><tr><th>Semester</th><th>Class</th><th>Actions</th></tr></thead>
             <tbody id="semestersTable"></tbody>
           </table>
+          </div>
         </div>
 
         <!-- Users Section -->
         <div id="users" class="section" style="display:none;">
           <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addUserModal">+ Add User</button>
+          <div class="table-responsive">
           <table class="table table-bordered">
             <thead><tr><th>Username</th><th>Actions</th></tr></thead>
             <tbody id="usersTable"></tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>
@@ -469,6 +510,27 @@
         document.getElementById(id).style.display="block";
         document.getElementById("sectionTitle").innerText = id.charAt(0).toUpperCase() + id.slice(1);
       });
+    });
+
+    // Mobile offcanvas navigation
+    document.querySelectorAll('#mobileNavLinks a[data-section]')?.forEach(link=>{
+      link.addEventListener('click', ()=>{
+        document.querySelectorAll('.section').forEach(sec=>sec.style.display = 'none');
+        const id = link.getAttribute('data-section');
+        document.getElementById(id).style.display = 'block';
+        document.getElementById('sectionTitle').innerText = id.charAt(0).toUpperCase() + id.slice(1);
+        const offcanvasEl = document.getElementById('mobileMenu');
+        bootstrap.Offcanvas.getInstance(offcanvasEl)?.hide();
+      });
+    });
+
+    // Mobile logout
+    document.getElementById('logoutBtnMobile')?.addEventListener('click', ()=>{
+      localStorage.removeItem('token');
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'flex';
+      const offcanvasEl = document.getElementById('mobileMenu');
+      bootstrap.Offcanvas.getInstance(offcanvasEl)?.hide();
     });
 
     // ===== Loaders =====
