@@ -883,6 +883,28 @@
     // ===== Init =====
     // Keep dashboard hidden until logged in
     // When logged in, loadAllTables() is called by login handler
+    document.addEventListener('DOMContentLoaded', async () => {
+      const token = getToken();
+      if(!token){
+        // no token, ensure login screen visible
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        return;
+      }
+      // validate token by trying a lightweight authorized call
+      try{
+        await api('/api/classes');
+        // token valid: show dashboard and load data
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        await loadAllTables();
+      }catch(err){
+        // token invalid or request failed: reset to login
+        localStorage.removeItem('token');
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+      }
+    });
   </script>
 </body>
 </html>
