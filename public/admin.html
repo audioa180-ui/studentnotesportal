@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - College Notes Portal</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { font-family: "Poppins", sans-serif; background: #f5f7fa; }
+    .login-container { height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .dashboard { display: none; }
+    .sidebar { height: 100vh; background: linear-gradient(135deg, #141e30, #243b55); color: white; padding: 20px; }
+    .sidebar h2 { font-size: 1.5rem; margin-bottom: 30px; }
+    .sidebar a { display: block; padding: 10px; color: white; text-decoration: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; }
+    .sidebar a:hover { background: rgba(255,255,255,0.2); }
+    .content { padding: 20px; }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div class="login-container" id="loginScreen">
+    <div class="card shadow p-4" style="width: 350px;">
+      <h3 class="text-center mb-3">Admin Login</h3>
+      <div class="mb-3"><input type="text" id="username" class="form-control" placeholder="Username"></div>
+      <div class="mb-3"><input type="password" id="password" class="form-control" placeholder="Password"></div>
+      <button class="btn btn-primary w-100" id="loginBtn">Login</button>
+      <p id="errorMsg" class="text-danger text-center mt-2" style="display:none;">Invalid credentials</p>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard">
+    <div class="d-flex">
+      <div class="sidebar">
+        <h2>Admin Panel</h2>
+        <a data-section="notes">📚 Manage Notes</a>
+        <a data-section="subjects">📖 Manage Subjects</a>
+        <a data-section="classes">🏫 Manage Classes</a>
+        <a data-section="semesters">📅 Manage Semesters</a>
+        <a data-section="users">👤 Manage Users</a>
+        <a id="logoutBtn">🚪 Logout</a>
+      </div>
+
+      <div class="content flex-grow-1">
+        <h2 id="sectionTitle">Dashboard</h2>
+
+        <!-- Notes Section -->
+        <div id="notes" class="section">
+          <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addNoteModal">+ Add Note</button>
+          <table class="table table-striped">
+            <thead><tr><th>Note Title</th><th>Subject</th><th>Semester</th><th>Class</th><th>File</th><th>Actions</th></tr></thead>
+            <tbody id="notesTable"></tbody>
+          </table>
+        </div>
+
+        <!-- Subjects Section -->
+        <div id="subjects" class="section" style="display:none;">
+          <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addSubjectModal">+ Add Subject</button>
+          <table class="table table-bordered">
+            <thead><tr><th>Subject Name</th><th>Semester</th><th>Actions</th></tr></thead>
+            <tbody id="subjectsTable"></tbody>
+          </table>
+        </div>
+
+        <!-- Classes Section -->
+        <div id="classes" class="section" style="display:none;">
+          <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addClassModal">+ Add Class</button>
+          <table class="table table-hover">
+            <thead><tr><th>Class Name</th><th>Actions</th></tr></thead>
+            <tbody id="classesTable"></tbody>
+          </table>
+        </div>
+
+        <!-- Semesters Section -->
+        <div id="semesters" class="section" style="display:none;">
+          <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addSemesterModal">+ Add Semester</button>
+          <table class="table table-hover">
+            <thead><tr><th>Semester</th><th>Class</th><th>Actions</th></tr></thead>
+            <tbody id="semestersTable"></tbody>
+          </table>
+        </div>
+
+        <!-- Users Section -->
+        <div id="users" class="section" style="display:none;">
+          <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addUserModal">+ Add User</button>
+          <table class="table table-bordered">
+            <thead><tr><th>Username</th><th>Actions</th></tr></thead>
+            <tbody id="usersTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <!-- Note Modal -->
+  <div class="modal fade" id="addNoteModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add New Note</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><form id="noteForm">
+        <div class="mb-3"><label class="form-label">Note Title</label><input type="text" id="noteTitle" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Select Class</label><select id="noteClass" class="form-select" required></select></div>
+        <div class="mb-3"><label class="form-label">Select Semester</label><select id="noteSemester" class="form-select" required></select></div>
+        <div class="mb-3"><label class="form-label">Select Subject</label><select id="noteSubject" class="form-select" required></select></div>
+        <div class="mb-3"><label class="form-label">Upload File</label><input type="file" id="noteFile" class="form-control" required></div>
+        <button type="submit" class="btn btn-primary w-100">Save Note</button>
+      </form></div></div></div>
+  </div>
+
+  <!-- Subject Modal -->
+  <div class="modal fade" id="addSubjectModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add New Subject</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><form id="subjectForm">
+        <div class="mb-3"><label class="form-label">Select Class</label><select id="subjectClass" class="form-select" required></select></div>
+        <div class="mb-3"><label class="form-label">Select Semester</label><select id="subjectSemester" class="form-select" required></select></div>
+        <div class="mb-3"><label class="form-label">Subject Name</label><input type="text" id="subjectName" class="form-control" required></div>
+        <button type="submit" class="btn btn-primary w-100">Save Subject</button>
+      </form></div></div></div>
+  </div>
+
+  <!-- Class Modal -->
+  <div class="modal fade" id="addClassModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add New Class</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><form id="classForm">
+        <div class="mb-3"><label class="form-label">Class Name</label><input type="text" id="className" class="form-control" required></div>
+        <button type="submit" class="btn btn-primary w-100">Save Class</button>
+      </form></div></div></div>
+  </div>
+
+  <!-- Semester Modal -->
+  <div class="modal fade" id="addSemesterModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add New Semester</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><form id="semesterForm">
+        <div class="mb-3"><label class="form-label">Select Class</label><select id="semesterClass" class="form-select" required></select></div>
+        <div class="mb-3"><label class="form-label">Semester Name</label><input type="text" id="semesterName" class="form-control" required></div>
+        <button type="submit" class="btn btn-primary w-100">Save Semester</button>
+      </form></div></div></div>
+  </div>
+
+  <!-- User Modal -->
+  <div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add New User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><form id="userForm">
+        <div class="mb-3"><label class="form-label">Username</label><input type="text" id="newUsername" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Password</label><input type="password" id="newPassword" class="form-control" required></div>
+        <button type="submit" class="btn btn-primary w-100">Save User</button>
+      </form></div></div></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function getToken(){ return localStorage.getItem('token'); }
+
+    async function api(path, opts={}, requireAuth=true){
+      opts.headers = opts.headers || {};
+      if(requireAuth){
+        const token = getToken();
+        if(token) opts.headers['Authorization'] = 'Bearer ' + token;
+      }
+      const res = await fetch(path, opts);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json().catch(()=>null);
+    }
+
+    // ===== Login =====
+    document.getElementById("loginBtn").addEventListener("click", async ()=>{
+      let u=document.getElementById("username").value.trim();
+      let p=document.getElementById("password").value.trim();
+      try{
+        const data = await api('/api/login', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ username: u, password: p })
+        }, false);
+        if (!data || !data.token) throw new Error("Invalid");
+        localStorage.setItem('token', data.token);
+        document.getElementById("loginScreen").style.display="none";
+        document.getElementById("dashboard").style.display="block";
+        document.getElementById("errorMsg").style.display="none";
+        loadAllTables();
+      }catch(err){
+        document.getElementById("errorMsg").style.display="block";
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click",()=>{
+      localStorage.removeItem('token');
+      document.getElementById("dashboard").style.display="none";
+      document.getElementById("loginScreen").style.display="flex";
+    });
+
+    document.querySelectorAll(".sidebar a[data-section]").forEach(link=>{
+      link.addEventListener("click",()=>{
+        document.querySelectorAll('.section').forEach(sec=>sec.style.display="none");
+        let id=link.getAttribute("data-section");
+        document.getElementById(id).style.display="block";
+        document.getElementById("sectionTitle").innerText=id.charAt(0).toUpperCase()+id.slice(1);
+      });
+    });
+
+    // ===== Load Data =====
+    async function loadAllTables(){
+      await loadClasses();
+      await loadSemesters();
+      await loadSubjects();
+      await loadNotes();
+      await loadUsers();
+    }
+
+    async function loadClasses(){
+      const classes = await api('/api/classes');
+      const tbody = document.getElementById('classesTable');
+      tbody.innerHTML = '';
+      classes.forEach(c=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${c.name}</td>
+                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${c._id}','class')">Delete</button></td>`;
+        tbody.appendChild(tr);
+      });
+      // fill semester class select
+      const semSel = document.getElementById('semesterClass');
+      semSel.innerHTML = '';
+      classes.forEach(c=> semSel.innerHTML += `<option value="${c._id}">${c.name}</option>`);
+      // fill note class select
+      const noteSel = document.getElementById('noteClass');
+      noteSel.innerHTML = '';
+      classes.forEach(c=> noteSel.innerHTML += `<option value="${c._id}">${c.name}</option>`);
+      // fill subject class select
+      const subjSel = document.getElementById('subjectClass');
+      subjSel.innerHTML = '';
+      classes.forEach(c=> subjSel.innerHTML += `<option value="${c._id}">${c.name}</option>`);
+    }
+
+    async function loadSemesters(){
+      const semesters = await api('/api/semesters');
+      const tbody = document.getElementById('semestersTable');
+      tbody.innerHTML = '';
+      semesters.forEach(s=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${s.name}</td>
+                        <td>${s.class_id?.name||''}</td>
+                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${s._id}','semester')">Delete</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function loadSubjects(){
+      const subjects = await api('/api/subjects');
+      const tbody = document.getElementById('subjectsTable');
+      tbody.innerHTML = '';
+      subjects.forEach(s=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${s.name}</td>
+                        <td>${s.semester_id?.name||''} (${s.semester_id?.class_id?.name||''})</td>
+                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${s._id}','subject')">Delete</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function loadNotes(){
+      const notes = await api('/api/notes');
+      const tbody = document.getElementById('notesTable');
+      tbody.innerHTML = '';
+      notes.forEach(n=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${n.title}</td>
+                        <td>${n.subject_id?.name||''}</td>
+                        <td>${n.subject_id?.semester_id?.name||''}</td>
+                        <td>${n.subject_id?.semester_id?.class_id?.name||''}</td>
+                        <td><a href="${n.file}" target="_blank">Download</a></td>
+                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${n._id}','note')">Delete</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function loadUsers(){
+      const users = await api('/api/users');
+      const tbody = document.getElementById('usersTable');
+      tbody.innerHTML = '';
+      users.forEach(u=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${u.username}</td>
+                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('${u._id}','user')">Delete</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ===== Delete Item =====
+    async function deleteItem(id, type){
+      if (!confirm('Delete?')) return;
+      let path = '/api/';
+      if (type === 'class') path += 'classes/';
+      else if (type === 'semester') path += 'semesters/';
+      else if (type === 'subject') path += 'subjects/';
+      else if (type === 'note') path += 'notes/';
+      else if (type === 'user') path += 'users/';
+      await api(path + id, { method: 'DELETE' });
+      loadAllTables();
+    }
+
+    // ===== Form Submissions =====
+    document.getElementById('classForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const name = document.getElementById('className').value.trim();
+      await api('/api/classes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+      this.reset(); loadClasses();
+      bootstrap.Modal.getInstance(document.getElementById('addClassModal')).hide();
+    });
+
+    document.getElementById('semesterForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const name = document.getElementById('semesterName').value.trim();
+      const class_id = document.getElementById('semesterClass').value;
+      await api('/api/semesters', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, class_id }) });
+      this.reset(); loadSemesters();
+      bootstrap.Modal.getInstance(document.getElementById('addSemesterModal')).hide();
+    });
+
+    document.getElementById('subjectForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const name = document.getElementById('subjectName').value.trim();
+      const semester_id = document.getElementById('subjectSemester').value;
+      await api('/api/subjects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, semester_id }) });
+      this.reset(); loadSubjects();
+      bootstrap.Modal.getInstance(document.getElementById('addSubjectModal')).hide();
+    });
+
+    document.getElementById('noteForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const title = document.getElementById('noteTitle').value.trim();
+      const subject_id = document.getElementById('noteSubject').value;
+      const file = document.getElementById('noteFile').files[0];
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('subject_id', subject_id);
+      formData.append('file', file);
+      await api('/api/notes', { method:'POST', body: formData });
+      this.reset(); loadNotes();
+      bootstrap.Modal.getInstance(document.getElementById('addNoteModal')).hide();
+    });
+
+    document.getElementById('userForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const username = document.getElementById('newUsername').value.trim();
+      const password = document.getElementById('newPassword').value.trim();
+      await api('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password }) });
+      this.reset(); loadUsers();
+      bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+    });
+  </script>
+</body>
+</html>
