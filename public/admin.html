@@ -306,6 +306,34 @@
       selectEl.innerHTML = opts.join('');
     }
 
+    // --- helpers to build semester option lists filtered by class to avoid duplicates ---
+    function getClassNameById(id){
+      if(!id) return '';
+      const c = (__classes || []).find(cc => cc._id === id);
+      return c?.name || '';
+    }
+
+    function semestersForClass(classId){
+      return (__semesters || []).filter(s => {
+        const sd = normalizeDoc(s);
+        return !classId || sd.classId?._id === classId || sd.classId === classId;
+      });
+    }
+
+    function setSemesterOptionsFor(selectEl, classId, { includeAll = false, showClassWhenNoFilter = false } = {}){
+      if(!selectEl) return;
+      const semesters = semestersForClass(classId).map(s => normalizeDoc(s));
+      const opts = [];
+      if(includeAll){
+        opts.push('<option value="">All</option>');
+      }
+      for(const s of semesters){
+        const label = (!classId && showClassWhenNoFilter) ? `${s.name} (${s.classId?.name || ''})` : (s.name || '');
+        opts.push(`<option value="${s._id}">${label}</option>`);
+      }
+      selectEl.innerHTML = opts.join('');
+    }
+
     // Update the Note Subject filter based on current Class/Semester filters
     function updateNoteSubjectFilter(){
       const subjSel = document.getElementById('noteFilterSubject');
@@ -565,6 +593,11 @@
         // populate filter selects (with All)
         setOptions(document.getElementById('subjectFilterClass'), classes, c=>c._id, c=>c.name, true);
         setOptions(document.getElementById('noteFilterClass'), classes, c=>c._id, c=>c.name, true);
+        // ensure semester dropdowns depend on currently selected class
+        setSemesterOptionsFor(document.getElementById('subjectSemester'), document.getElementById('subjectClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
+        setSemesterOptionsFor(document.getElementById('noteSemester'), document.getElementById('noteClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
+        setSemesterOptionsFor(document.getElementById('subjectFilterSemester'), document.getElementById('subjectFilterClass')?.value || '', { includeAll: true, showClassWhenNoFilter: true });
+        setSemesterOptionsFor(document.getElementById('noteFilterSemester'), document.getElementById('noteFilterClass')?.value || '', { includeAll: true, showClassWhenNoFilter: true });
         // re-render tables since filter options may affect visible state
         renderSubjectsTable();
         renderNotesTable();
@@ -580,16 +613,12 @@
         __semesters = semesters;
         // render semesters table using renderer (supports sorting)
         renderSemestersTable();
-        // populate semester selects used for subjects/notes
-        const subjSemester = document.getElementById('subjectSemester');
-        const noteSemester = document.getElementById('noteSemester');
-        [subjSemester, noteSemester].forEach(sel=>{
-          if(!sel) return;
-          sel.innerHTML = semesters.map(s=>`<option value="${s._id}">${normalizeDoc(s).name}</option>`).join('');
-        });
-        // filter selects (with All)
-        setOptions(document.getElementById('subjectFilterSemester'), semesters, s=>s._id, s=>normalizeDoc(s).name, true);
-        setOptions(document.getElementById('noteFilterSemester'), semesters, s=>s._id, s=>normalizeDoc(s).name, true);
+        // populate semester selects used for subjects/notes based on chosen class
+        setSemesterOptionsFor(document.getElementById('subjectSemester'), document.getElementById('subjectClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
+        setSemesterOptionsFor(document.getElementById('noteSemester'), document.getElementById('noteClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
+        // filter selects (with All) - filter by selected class when provided, otherwise show class in label to avoid duplicates
+        setSemesterOptionsFor(document.getElementById('subjectFilterSemester'), document.getElementById('subjectFilterClass')?.value || '', { includeAll: true, showClassWhenNoFilter: true });
+        setSemesterOptionsFor(document.getElementById('noteFilterSemester'), document.getElementById('noteFilterClass')?.value || '', { includeAll: true, showClassWhenNoFilter: true });
         updateNoteSubjectFilter();
         renderSubjectsTable();
         renderNotesTable();
@@ -759,6 +788,8 @@
     // ===== Filters & Sorting: Event listeners =====
     // Subjects filters
     document.getElementById('subjectFilterClass')?.addEventListener('change', ()=>{
+      // update semester filter options based on selected class to avoid duplicates
+      setSemesterOptionsFor(document.getElementById('subjectFilterSemester'), document.getElementById('subjectFilterClass')?.value || '', { includeAll: true, showClassWhenNoFilter: true });
       renderSubjectsTable();
     });
     document.getElementById('subjectFilterSemester')?.addEventListener('change', ()=>{
@@ -779,6 +810,8 @@
 
     // Notes filters
     document.getElementById('noteFilterClass')?.addEventListener('change', ()=>{
+      // update semester filter options based on selected class to avoid duplicates
+      setSemesterOptionsFor(document.getElementById('noteFilterSemester'), document.getElementById('noteFilterClass')?.value || '', { includeAll: true, showClassWhenNoFilter: true });
       updateNoteSubjectFilter();
       renderNotesTable();
     });
@@ -801,6 +834,8 @@
       if(sSel) sSel.value = '';
       if(subSel) subSel.value = '';
       if(sortSel) sortSel.value = 'title';
+      // refresh semester filter options for 'All' classes state
+      setSemesterOptionsFor(document.getElementById('noteFilterSemester'), '', { includeAll: true, showClassWhenNoFilter: true });
       updateNoteSubjectFilter();
       renderNotesTable();
     });
@@ -811,6 +846,14 @@
     });
     document.getElementById('semesterSortBy')?.addEventListener('change', ()=>{
       renderSemestersTable();
+    });
+
+    // Update semester selects in Add forms when class changes
+    document.getElementById('noteClass')?.addEventListener('change', ()=>{
+      setSemesterOptionsFor(document.getElementById('noteSemester'), document.getElementById('noteClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
+    });
+    document.getElementById('subjectClass')?.addEventListener('change', ()=>{
+      setSemesterOptionsFor(document.getElementById('subjectSemester'), document.getElementById('subjectClass')?.value, { includeAll: false, showClassWhenNoFilter: false });
     });
 
     // ===== Init =====
